@@ -28,19 +28,19 @@ def packet_ratio(df):
 def time_interval_std(df):
   return np.std(np.diff(df['Time']))
 
-## third feature
+## third feature: average of downloaded bytes in a chunk
 def avg_download_bytes(df):
   return np.mean(df['2->1Bytes'])
 
-## fourth feature
+## fourth feature: standard deviation of downloaded bytes in a chunk
 def std_download_bytes(df):
   return np.std(df['2->1Bytes'])
 
-## fifth feature:
+## fifth feature: average of uploaded bytes in a chunk
 def avg_upload_bytes(df):
   return np.mean(df['1->2Bytes'])
 
-## sixth feature
+## sixth feature: standard deviation of uploaded bytes in a chunk
 def std_upload_bytes(df):
   return np.std(df['1->2Bytes'])
 
@@ -57,6 +57,7 @@ def feature_cols(df):
   ])
 
   return temp_row
+
 def chunk_data(fp, interval=60, select_col=[
     'Time',
     '1->2Bytes',
@@ -82,8 +83,10 @@ def chunk_data(fp, interval=60, select_col=[
     'packet_ratio'
   ]
 
+  ## standardize the data and get only the peaks
   df = get_peaks(std_df(pd.read_csv(fp)[select_col]))
 
+  ## ensure that there is enough data to produce uniform chunks
   total_chunks = np.floor(df['Time'].max() / interval).astype(int)
 
   for chunk in np.arange(total_chunks):

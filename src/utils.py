@@ -40,5 +40,9 @@ def std_df(df):
   return df
 
 def get_peaks(df, col='2->1Bytes', min_height=100000):
+  """
+  gets the peaks in a column. default is set to downloaded bytes columns
+  and a minimum height of 100000
+  """
   peaks = df.iloc[find_peaks(df[col], height=min_height)[0], :]
   return peaks

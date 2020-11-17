@@ -12,9 +12,12 @@ def main(targets):
 
     data_fp_params = json.load(open('config/data-fp.json'))
 
+    trained = train_clf(pd.read_csv('data/training.csv'))
+    logreg_clf = trained[0]
+    clf_report = trained[1]
+
     if 'predict' in targets:
 
-        logreg_clf = train_clf(pd.read_csv('data/training.csv'))
         chunked = chunk_data(**data_fp_params)
 
         pred_lst = []
@@ -36,6 +39,9 @@ def main(targets):
                 'stream?': pred_lst
         })
         )
+
+    if 'scores' in targets:
+        print(clf_report)
 
 if __name__ == '__main__':
     targets = sys.argv[1:]

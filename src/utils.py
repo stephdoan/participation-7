@@ -6,6 +6,9 @@ import re
 import scipy as sp
 from scipy import fft as fft
 
+import warnings
+warnings.filterwarnings('ignore')
+
 def std_df(df, time):
   """
   Takes unix time and standardizes to [time unit] starting from 0.

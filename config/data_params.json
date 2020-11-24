@@ -1,7 +1,7 @@
 {
-  "folder": "../data/"
-  "fp_lst": ["data/test_file.csv"],
+  "folder": "data/",
+  "fp_lst": ["test_file.csv"],
   "chunk": 100,
-  "labels": False,
-  "video": False
+  "labels": "False",
+  "video": "False"
 }

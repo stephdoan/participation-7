@@ -6,6 +6,9 @@ import re
 import scipy as sp
 from scipy import fft as fft
 
+import warnings
+warnings.filterwarnings('ignore')
+
 from utils import *
 
 def label_data(df, video, labels):
@@ -43,12 +46,12 @@ def create_spectral_features(chunk_lst, col):
 
   return psd_freq_df
 
-def create_features(fp_lst, chunk, labels=False, video=False):
+def create_features(folder, fp_lst, chunk, labels=False, video=False):
 
   chunk_lst = []
 
   for data_fp in fp_lst:
-    df, idx = chunk_data(pd.read_csv('../data/' + data_fp), chunk)
+    df, idx = chunk_data(pd.read_csv(folder + data_fp), chunk)
     for i in idx:
       chunk_lst.append(df.iloc[i])
 

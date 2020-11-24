@@ -3,46 +3,83 @@ import pandas as pd
 import numpy as np
 import re
 
-from sklearn import linear_model
-from scipy.signal import find_peaks
+import scipy as sp
+from scipy import fft as fft
 
-def organize_data(lst):
+def std_df(df, time):
   """
-  takes in a list of file names and the collection condition (vpn or no vpn)
-
-  returns an array of 2 arrays - one contains streaming and the other
-  contains no streaming
+  Takes unix time and standardizes to [time unit] starting from 0.
+  time is the time_column
   """
-
-  stream_lst = []
-  nostream_lst = []
-
-  for fp in lst:
-    #novpn_match = re.search(r"-novpn-", fp)
-    vpn_match = re.search(r"-vpn-", fp)
-
-    if vpn_match:
-
-      streaming = re.findall(r"youtube|vimeo|netflix|amazonprime|disneyplus|espnplus|hbomax|hulu", fp)
-
-      if streaming:
-        stream_lst.append(fp)
-      else:
-        nostream_lst.append(fp)
-
-  return np.array((np.array(nostream_lst), np.array(stream_lst)))
-
-def std_df(df):
-  """
-  Takes unix time and standardizes to seconds starting at 0.
-  """
-  df['Time'] = df['Time'] - np.min(df['Time'])
+  df[time] = df[time] - np.min(df[time])
   return df
 
-def get_peaks(df, col='2->1Bytes', min_height=100000):
+def get_files(lst, category, vpn=True):
+
+  clean_lst = [x for x in lst if not re.search(r"-noisy-", x)]
+
+  vpn_lst = [fp for fp in clean_lst if re.search(r'-vpn-', fp)]
+  novpn_lst = [fp for fp in clean_lst if re.search(r'-novpn-', fp)]
+
+
+  if vpn:
+    cat_lst = [file for file in vpn_lst if re.search(category, file)]
+  else:
+    cat_lst = [file for file in novpn_lst if re.search(category, file)]
+
+  return cat_lst
+
+def chunk_data(df, size):
   """
-  gets the peaks in a column. default is set to downloaded bytes columns
-  and a minimum height of 100000
+  returns dict of indices for equal sized samples
+
+  parameters:
+
+  df: dataframe
+    network-stats output
+
+  size: int
+    period of our observations in a session
+
   """
-  peaks = df.iloc[find_peaks(df[col], height=min_height)[0], :]
-  return peaks
+  df = std_df(df, 'Time')
+  total_chunks = np.floor(df['Time'].max() / size).astype(int)
+
+  max_time_df = df[df['Time'] < (total_chunks * size)]
+
+  max_time_df['Time'] = pd.to_datetime(max_time_df['Time'], unit='s')
+
+  grouped = max_time_df.groupby('Time')[[
+    '2->1Bytes',
+    '1->2Bytes',
+    '2->1Pkts',
+    '1->2Pkts']
+  ].sum().reset_index()
+
+  sampled = grouped.resample(str(size) +'s', on='Time')
+  sampled = list(sampled.indices.values())
+
+  return [grouped, sampled]
+
+def fft_df(df, col):
+  df_fft = sp.fft.fft(df[col])
+  df_amp = np.abs(df_fft)
+  df_psd = df_amp ** 2
+
+  df_fft_freq = sp.fft.fftfreq(df_fft.size)
+
+  idx = df_fft_freq > 0
+
+  return pd.DataFrame({
+    'freq': df_fft_freq[idx],
+    'psd': df_psd[idx]
+  })
+
+def get_psd_freq(df, col):
+  """
+  returns max psd value and corresponding frequency
+  """
+
+  fft_temp = fft_df(df, col)
+
+  return fft_temp.iloc[fft_temp['psd'].idxmax()].values

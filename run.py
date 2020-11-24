@@ -2,46 +2,36 @@ import pandas as pd
 import numpy as np
 import json
 import sys
+import pickle
 
 sys.path.insert(0, 'src')
 from utils import *
 from feature import *
-from train import *
+from model import *
 
 def main(targets):
 
-    data_fp_params = json.load(open('config/data-fp.json'))
+    data_params = json.load(open('config/data_params.json'))
 
-    trained = train_clf(pd.read_csv('data/training.csv'))
-    logreg_clf = trained[0]
-    clf_report = trained[1]
+    model = pickle.load(open('logreg_model_24112020.sav', 'rb'))
 
     if 'predict' in targets:
 
-        chunked = chunk_data(**data_fp_params)
+        chunks = create_features(**data_params)
 
-        pred_lst = []
+        if data_params['labels']:
+            X = chunks.drop(columns=['video'])
+            y = chunks['video']
 
-        for i in np.arange(len(chunked)):
+            preds = model.predict(X)
 
-          pred_i = logreg_clf.predict(chunked.loc[i].values.reshape(1, -1))
+            print(preds)
 
-          if (pred_i == 1):
-              pred_lst.append('yes')
+        else:
+            X = chunks
+            preds = model.predict(X)
+            print(preds)
 
-          else:
-              pred_lst.append('no')
-        sec = data_fp_params['interval']
-        time_intervals = [(i*sec, (i+1)*sec) for i in np.arange(len(pred_lst))]
-
-        print(pd.DataFrame({
-                'time_intervals': time_intervals,
-                'stream?': pred_lst
-        })
-        )
-
-    if 'scores' in targets:
-        print(clf_report)
 
 if __name__ == '__main__':
     targets = sys.argv[1:]

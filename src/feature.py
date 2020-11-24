@@ -3,98 +3,65 @@ import pandas as pd
 import numpy as np
 import re
 
-from sklearn import linear_model
-from scipy.signal import find_peaks
+import scipy as sp
+from scipy import fft as fft
 
 from utils import *
 
-features = [
-  'time_interval_std',
-  'avg_down',
-  'std_down',
-  'avg_up',
-  'std_up',
-  'packet_ratio'
-]
-
-## first feature: packet ratio
-def packet_ratio(df):
+def label_data(df, video, labels):
   """
-  return a column of packet ratio in a given second
+  video is a boolean; True if video and false else
   """
-  return np.mean(df['1->2Pkts'] / df['2->1Pkts'])
 
-## second feature: variance of time between peaks
-def time_interval_std(df):
-  return np.std(np.diff(df['Time']))
+  if not labels:
+    return df
 
-## third feature: average of downloaded bytes in a chunk
-def avg_download_bytes(df):
-  return np.mean(df['2->1Bytes'])
+  else:
+    if video:
+      df['video'] = np.ones(len(df))
+    else:
+      df['video'] = np.zeros(len(df))
 
-## fourth feature: standard deviation of downloaded bytes in a chunk
-def std_download_bytes(df):
-  return np.std(df['2->1Bytes'])
+  return df
 
-## fifth feature: average of uploaded bytes in a chunk
-def avg_upload_bytes(df):
-  return np.mean(df['1->2Bytes'])
+def create_spectral_features(chunk_lst, col):
 
-## sixth feature: standard deviation of uploaded bytes in a chunk
-def std_upload_bytes(df):
-  return np.std(df['1->2Bytes'])
+  chunk_freq = []
+  chunk_psd = []
 
-## create features from a chunk of data
-def feature_cols(df):
+  for chunk in chunk_lst:
 
-  temp_row = np.array([
-    time_interval_std(df),
-    avg_download_bytes(df),
-    std_download_bytes(df),
-    avg_upload_bytes(df),
-    std_upload_bytes(df),
-    packet_ratio(df)
-  ])
+    vals = get_psd_freq(chunk, col)
 
-  return temp_row
+    chunk_freq.append(vals[0])
+    chunk_psd.append(vals[1])
 
-def chunk_data(fp, interval=60, select_col=[
-    'Time',
-    '1->2Bytes',
-    '2->1Bytes',
-    '1->2Pkts',
-    '2->1Pkts',
-    'packet_times',
-    'packet_sizes'
-  ]):
+  psd_freq_df = pd.DataFrame({
+    col+'_psd': chunk_psd,
+    col+'_freq': chunk_freq
+  })
 
-  """
-  takes in a filepath to the data you want to chunk and feature engineer
-  chunks our data into a specified time interval
-  each chunk is then turned into an observation to be fed into our classifier
-  """
-  chunk_feature = []
-  chunk_col = [
-    'time_interval_std',
-    'avg_down',
-    'std_down',
-    'avg_up',
-    'std_up',
-    'packet_ratio'
-  ]
+  return psd_freq_df
 
-  ## standardize the data and get only the peaks
-  df = get_peaks(std_df(pd.read_csv(fp)[select_col]))
+def create_features(fp_lst, chunk, labels=False, video=False):
 
-  ## ensure that there is enough data to produce uniform chunks
-  total_chunks = np.floor(df['Time'].max() / interval).astype(int)
+  chunk_lst = []
 
-  for chunk in np.arange(total_chunks):
+  for data_fp in fp_lst:
+    df, idx = chunk_data(pd.read_csv('../data/' + data_fp), chunk)
+    for i in idx:
+      chunk_lst.append(df.iloc[i])
 
-    start = chunk * interval
-    end = (chunk+1) * interval
+  download_bytes = create_spectral_features(chunk_lst, '2->1Bytes')
+  upload_bytes = create_spectral_features(chunk_lst, '1->2Bytes')
+  download_pkts = create_spectral_features(chunk_lst, '2->1Pkts')
+  upload_pkts = create_spectral_features(chunk_lst, '2->1Pkts')
 
-    temp_df = (df[(df['Time'] >= start) & (df['Time'] < end)])
-    chunk_feature.append(feature_cols(temp_df))
+  feature_df = label_data(pd.concat([
+    download_bytes,
+    upload_bytes,
+    download_pkts,
+    upload_pkts
+  ], axis=1), video, labels)
 
-  return pd.DataFrame(data=chunk_feature, columns=chunk_col).dropna()
+  return feature_df

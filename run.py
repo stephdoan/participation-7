@@ -23,12 +23,8 @@ def main(targets):
 
         print(test_chunks)
 
-        if 'video' in test_chunks.columns:
-            print('Now checking predict target')
-            preds = model.predict(test_chunks.drop(columns=['video']))
-
-        else:
-            preds = model.predict(test_chunks)
+        print('Now checking predict target')
+        preds = model.predict(test_chunks)
 
         print(preds)
 

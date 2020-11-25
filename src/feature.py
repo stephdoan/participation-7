@@ -58,7 +58,7 @@ def create_features(folder, fp_lst, chunk, labels=False, video=False):
   download_bytes = create_spectral_features(chunk_lst, '2->1Bytes')
   upload_bytes = create_spectral_features(chunk_lst, '1->2Bytes')
   download_pkts = create_spectral_features(chunk_lst, '2->1Pkts')
-  upload_pkts = create_spectral_features(chunk_lst, '2->1Pkts')
+  upload_pkts = create_spectral_features(chunk_lst, '1->2Pkts')
 
   feature_df = label_data(pd.concat([
     download_bytes,

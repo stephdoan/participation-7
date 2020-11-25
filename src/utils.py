@@ -65,7 +65,7 @@ def chunk_data(df, size):
   return [grouped, sampled]
 
 def fft_df(df, col):
-  df_fft = sp.fft.fft(df[col])
+  df_fft = sp.fft.fft(df[col].values)
   df_amp = np.abs(df_fft)
   df_psd = df_amp ** 2
 

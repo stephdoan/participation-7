@@ -2,6 +2,6 @@
   "folder": "test_data/",
   "fp_lst": ["test_data.csv"],
   "chunk": 100,
-  "labels": "False",
-  "video": "False"
+  "labels": false,
+  "video": false
 }

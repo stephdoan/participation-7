@@ -46,7 +46,7 @@ def create_spectral_features(chunk_lst, col):
 
   return psd_freq_df
 
-def create_features(folder, fp_lst, chunk, labels=False, video=False):
+def create_features(folder, fp_lst, chunk, labels, video):
 
   chunk_lst = []
 
@@ -60,11 +60,15 @@ def create_features(folder, fp_lst, chunk, labels=False, video=False):
   download_pkts = create_spectral_features(chunk_lst, '2->1Pkts')
   upload_pkts = create_spectral_features(chunk_lst, '1->2Pkts')
 
-  feature_df = label_data(pd.concat([
+  feature_df =pd.concat([
     download_bytes,
     upload_bytes,
     download_pkts,
     upload_pkts
-  ], axis=1), video, labels)
+  ], axis=1)
 
-  return feature_df
+  if labels:
+    return label_data(feature_df, video, labels)
+
+  else:
+    return feature_df

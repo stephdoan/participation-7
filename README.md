@@ -17,11 +17,17 @@
 
 <section>
   <h3> Targets </h3>
+
   <p>
     <code>python run.py predict</code> will predict if there is video
     streaming in a network-stats session. The classifier chunks the data
     into uniform time periods and makes predictions on each time period. The
     default time period is 100 seconds. It will then print 1 or 0 - 1 means
-    there is video and 0 means there is no video. 
+    there is video and 0 means there is no video.
+  </p>
+
+  <p>
+    <code>python run.py test</code> will test that targets are working correctly.
+    runs both <code>predict</code> and <code>feature</code> targets (feature still being implemented).
   </p>
 </section>

@@ -4,7 +4,7 @@ import numpy as np
 import re
 
 import scipy as sp
-from scipy import fft as fft
+from scipy import signal
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -27,48 +27,93 @@ def label_data(df, video, labels):
 
   return df
 
-def create_spectral_features(chunk_lst, col):
+def spectral_features(df, col):
 
-  chunk_freq = []
-  chunk_psd = []
+  f, Pxx_den = sp.signal.welch(df[col], fs=2)
+  Pxx_den = np.sqrt(Pxx_den)
 
-  for chunk in chunk_lst:
+  peaks = sp.signal.find_peaks(Pxx_den)[0]
+  prominences = sp.signal.peak_prominences(Pxx_den, peaks)[0]
 
-    vals = get_psd_freq(chunk, col)
+  idx_max = prominences.argmax()
+  loc_max = peaks[idx_max]
 
-    chunk_freq.append(vals[0])
-    chunk_psd.append(vals[1])
+  return [f[loc_max], Pxx_den[loc_max], prominences[idx_max]]
 
-  psd_freq_df = pd.DataFrame({
-    col+'_psd': chunk_psd,
-    col+'_freq': chunk_freq
-  })
+def chunk_data(fp, interval=100, select_col=[
+    'Time',
+    '1->2Bytes',
+    '2->1Bytes',
+    '1->2Pkts',
+    '2->1Pkts',
+    'packet_times',
+    'packet_sizes',
+    'packet_dirs'
+  ]):
 
-  return psd_freq_df
+  """
+  takes in a filepath to the data you want to chunk and feature engineer
+  chunks our data into a specified time interval
+  each chunk is then turned into an observation to be fed into our classifier
+  """
+  chunk_feature = []
+  chunk_col = [
+    'dwl_freq',
+    'max_dwl_psd',
+    'dwl_peak_prominence',
+    'upl_freq',
+    'max_upl_psd',
+    'upl_peak_prominence'
+  ]
+
+
+  df = std_df(pd.read_csv(fp)[select_col], 'Time')
+
+  total_chunks = np.floor(df['Time'].max() / interval).astype(int)
+
+  for chunk in np.arange(total_chunks):
+
+    start = chunk * interval
+    end = (chunk+1) * interval
+
+    temp_df = (df[(df['Time'] >= start) & (df['Time'] < end)])
+
+    preproc = convert_ms_df(temp_df)
+
+    upl_bytes = preproc[preproc['pkt_src'] == '1']
+    dwl_bytes = preproc[preproc['pkt_src'] == '2']
+
+    dwl_resampled = dwl_bytes.resample('500ms', on='Time').sum()
+    upl_resampled = upl_bytes.resample('500ms', on='Time').sum()
+
+    dwl_psd_freq = spectral_features(dwl_resampled, 'pkt_size')
+    upl_psd_freq = spectral_features(upl_resampled, 'pkt_size')
+
+    chunk_feature.append(np.hstack((dwl_psd_freq, upl_psd_freq)))
+
+  #return chunk_lst
+  return pd.DataFrame(data=chunk_feature, columns=chunk_col).dropna()
 
 def create_features(folder, fp_lst, chunk, labels, video):
 
-  chunk_lst = []
+  chunk_col = [
+    'dwl_freq',
+    'max_dwl_psd',
+    'dwl_peak_prominence',
+    'upl_freq',
+    'max_upl_psd',
+    'upl_peak_prominence'
+  ]
+
+  chunked_df = pd.DataFrame(columns = chunk_col)
 
   for data_fp in fp_lst:
-    df, idx = chunk_data(pd.read_csv(folder + data_fp), chunk)
-    for i in idx:
-      chunk_lst.append(df.iloc[i])
+    temp_df = chunk_data(folder + data_fp, chunk)
+    chunked_df = pd.concat([chunked_df, temp_df])
 
-  download_bytes = create_spectral_features(chunk_lst, '2->1Bytes')
-  upload_bytes = create_spectral_features(chunk_lst, '1->2Bytes')
-  download_pkts = create_spectral_features(chunk_lst, '2->1Pkts')
-  upload_pkts = create_spectral_features(chunk_lst, '1->2Pkts')
-
-  feature_df =pd.concat([
-    download_bytes,
-    upload_bytes,
-    download_pkts,
-    upload_pkts
-  ], axis=1)
 
   if labels:
     return label_data(feature_df, video, labels)
 
   else:
-    return feature_df
+    return chunked_df

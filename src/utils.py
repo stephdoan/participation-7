@@ -32,57 +32,69 @@ def get_files(lst, category, vpn=True):
 
   return cat_lst
 
-def chunk_data(df, size):
+def clean_ext_entry(entry, dtype):
   """
-  returns dict of indices for equal sized samples
+  takes an entry, cleans the lists, and stores values in a numpy array.
+  helper method for expand_ext
 
   parameters:
+    entry: row entry from [packet_times, packet_sizes, packet_dirs]
+    dtype: choose from [float, np.int64, np.float64]
 
-  df: dataframe
-    network-stats output
-
-  size: int
-    period of our observations in a session
-
+  return:
+    array of int or floats
   """
-  df = std_df(df, 'Time')
-  total_chunks = np.floor(df['Time'].max() / size).astype(int)
+  clean_str = entry[:-1].strip()
+  split_str = clean_str.split(';')
+  to_type = np.array(split_str).astype(dtype)
+  return to_type
 
-  max_time_df = df[df['Time'] < (total_chunks * size)]
-
-  max_time_df['Time'] = pd.to_datetime(max_time_df['Time'], unit='s')
-
-  grouped = max_time_df.groupby('Time')[[
-    '2->1Bytes',
-    '1->2Bytes',
-    '2->1Pkts',
-    '1->2Pkts']
-  ].sum().reset_index()
-
-  sampled = grouped.resample(str(size) +'s', on='Time')
-  sampled = list(sampled.indices.values())
-
-  return [grouped, sampled]
-
-def fft_df(df, col):
-  df_fft = sp.fft.fft(df[col].values)
-  df_amp = np.abs(df_fft)
-  df_psd = df_amp ** 2
-
-  df_fft_freq = sp.fft.fftfreq(df_fft.size)
-
-  idx = df_fft_freq > 0
-
-  return pd.DataFrame({
-    'freq': df_fft_freq[idx],
-    'psd': df_psd[idx]
-  })
-
-def get_psd_freq(df, col):
+def create_ext_df(row, dtype, dummy_y=False, order=False):
   """
-  returns max psd value and corresponding frequency
+  takes in a row (series) from network-stats data and returns a dataframe of extended column entries
+
+  parameters:
+    row: row to expand into dataframe
+    dtype: choose from [float, np.int64, np.float64]
+
+  return:
+    dataframe of collected packet details in a network-stats second
   """
 
-  fft_temp = fft_df(df, col)
+  temp_df = pd.DataFrame(
+    {
+      'Time': clean_ext_entry(row['packet_times'], dtype),
+      'pkt_size': clean_ext_entry(row['packet_sizes'], dtype),
+      'pkt_src': clean_ext_entry(row['packet_dirs'], str)
+    }
+  )
 
-  return fft_temp.iloc[fft_temp['psd'].idxmax()].values
+  if dummy_y:
+    temp_df['dummy_y'] = np.zeros(len(temp_df))
+
+  if order:
+    temp_df['order'] = np.arange(len(temp_df))
+
+
+  return temp_df
+
+def convert_ms_df(df):
+  """
+  takes in a network-stats df and a specified second duration.
+  convert to milliseconds.
+  drop the ip address columns and the aggregate columns
+  """
+  df_lst = []
+
+  df.apply(lambda x: df_lst.append(create_ext_df(x, np.int64)), axis=1)
+
+  ms_df = pd.concat(df_lst)
+
+  sorted_df = ms_df.sort_values(by=['Time'])
+
+  sorted_df['Time'] = pd.to_datetime(sorted_df['Time'], unit='ms')
+
+  grouped_ms_src = sorted_df.groupby(['Time', 'pkt_src']).agg(
+    {'pkt_size':'sum'}).reset_index()
+
+  return grouped_ms_src

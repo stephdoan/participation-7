@@ -14,7 +14,7 @@ def main(targets):
     test_params = json.load(open('config/test_data.json'))
     data_params = json.load(open('config/data_params.json'))
 
-    model = pickle.load(open('logreg_model_24112020.sav', 'rb'))
+    model = pickle.load(open('logreg_model_01122020.sav', 'rb'))
 
     if 'test' in targets:
 
